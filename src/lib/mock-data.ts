@@ -1,0 +1,70 @@
+import type { PresentationSummary } from "@/lib/types";
+
+/** Mock data only — replaced by Supabase queries in a later phase. */
+export const MOCK_TEACHER = {
+  firstName: "Maria",
+  school: "Sampaguita Elementary School",
+};
+
+export const MOCK_PRESENTATIONS: PresentationSummary[] = [
+  {
+    id: "p-001",
+    title: "Parts of a Plant",
+    grade: "3",
+    subject: "science",
+    language: "english",
+    slideCount: 10,
+    theme: "jungle-adventure",
+    mode: "topic",
+    status: "ready",
+    updatedAt: "2026-11-18T09:24:00+08:00",
+  },
+  {
+    id: "p-002",
+    title: "Mga Bahagi ng Pananalita",
+    grade: "4",
+    subject: "filipino",
+    language: "filipino",
+    slideCount: 12,
+    theme: "crayon-box",
+    mode: "materials",
+    status: "generating",
+    updatedAt: "2026-11-19T08:02:00+08:00",
+  },
+  {
+    id: "p-003",
+    title: "Adding Fractions with Like Denominators",
+    grade: "5",
+    subject: "mathematics",
+    language: "taglish",
+    slideCount: 8,
+    theme: "ocean-explorer",
+    mode: "topic",
+    status: "draft",
+    updatedAt: "2026-11-17T15:40:00+08:00",
+  },
+  {
+    id: "p-004",
+    title: "The Solar System",
+    grade: "6",
+    subject: "science",
+    language: "english",
+    slideCount: 15,
+    theme: "space-galaxy",
+    mode: "materials",
+    status: "failed",
+    updatedAt: "2026-11-16T13:10:00+08:00",
+  },
+  {
+    id: "p-005",
+    title: "Ang Aking Pamilya",
+    grade: "1",
+    subject: "araling-panlipunan",
+    language: "filipino",
+    slideCount: 5,
+    theme: "rainbow-classroom",
+    mode: "topic",
+    status: "ready",
+    updatedAt: "2026-11-14T10:15:00+08:00",
+  },
+];
