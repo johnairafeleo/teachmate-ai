@@ -3,11 +3,15 @@ import { Suspense } from "react";
 
 import { CreatePresentationForm } from "@/components/create/create-presentation-form";
 import { EarlyDropGuard } from "@/components/create/early-drop-guard";
+import { requireUser } from "@/lib/auth/dal";
 import type { GenerationMode } from "@/lib/types";
 
 export const metadata: Metadata = {
   title: "Create presentation",
 };
+
+/** Server Actions on this page (document processing) may run up to a minute. */
+export const maxDuration = 60;
 
 export default function CreatePresentationPage({ searchParams }: PageProps<"/dashboard/create">) {
   return (
@@ -33,6 +37,7 @@ async function FormWithMode({
 }: {
   searchParams: PageProps<"/dashboard/create">["searchParams"];
 }) {
+  await requireUser();
   const { mode } = await searchParams;
   const initialMode: GenerationMode = mode === "materials" ? "materials" : "topic";
   // Keyed so client-side navigation between ?mode= links resets to the requested mode.

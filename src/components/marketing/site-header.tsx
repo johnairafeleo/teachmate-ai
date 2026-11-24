@@ -24,7 +24,10 @@ export function SiteHeader() {
               {link.label}
             </a>
           ))}
-          <Link href="/dashboard" className={buttonVariants({ className: "h-9 px-4" })}>
+          <Link href="/login" className={buttonVariants({ variant: "ghost", className: "h-9 px-3" })}>
+            Log in
+          </Link>
+          <Link href="/signup" className={buttonVariants({ className: "h-9 px-4" })}>
             Get Started
             <ArrowRight data-icon="inline-end" />
           </Link>

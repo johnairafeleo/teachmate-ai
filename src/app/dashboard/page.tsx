@@ -2,13 +2,21 @@ import { Suspense } from "react";
 import { CircleCheck, Layers, LoaderCircle, type LucideIcon } from "lucide-react";
 
 import { RecentPresentations } from "@/components/dashboard/recent-presentations";
+import { TeacherName } from "@/components/dashboard/teacher-card";
 import { WelcomeBanner } from "@/components/dashboard/welcome-banner";
-import { MOCK_PRESENTATIONS, MOCK_TEACHER } from "@/lib/mock-data";
+import { requireUser } from "@/lib/auth/dal";
+import { MOCK_PRESENTATIONS } from "@/lib/mock-data";
 
 export default function DashboardPage({ searchParams }: PageProps<"/dashboard">) {
   return (
     <div className="flex flex-col gap-8">
-      <WelcomeBanner firstName={MOCK_TEACHER.firstName} />
+      <WelcomeBanner
+        name={
+          <Suspense fallback={null}>
+            <TeacherName prefix=", " />
+          </Suspense>
+        }
+      />
       <Suspense fallback={<PresentationsSkeleton />}>
         <DashboardContent searchParams={searchParams} />
       </Suspense>
@@ -25,6 +33,8 @@ async function DashboardContent({
 }: {
   searchParams: PageProps<"/dashboard">["searchParams"];
 }) {
+  // Per-page check: layouts don't re-run on client navigation, so each page verifies the user.
+  await requireUser();
   const { view } = await searchParams;
   const presentations = view === "empty" ? [] : MOCK_PRESENTATIONS;
 

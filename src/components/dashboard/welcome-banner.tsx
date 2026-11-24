@@ -1,9 +1,11 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
 import { CirclePlus, FileUp, Lightbulb } from "lucide-react";
 
 import { buttonVariants } from "@/components/ui/button";
 
-export function WelcomeBanner({ firstName }: { firstName: string }) {
+/** `name` streams in (e.g. ", Maria Santos") so the banner itself stays in the static shell. */
+export function WelcomeBanner({ name }: { name?: ReactNode }) {
   return (
     <section className="relative overflow-hidden rounded-3xl bg-linear-to-br from-brand-purple to-brand-blue p-6 text-white sm:p-8">
       <div
@@ -17,7 +19,7 @@ export function WelcomeBanner({ firstName }: { firstName: string }) {
       <div className="relative flex flex-col gap-6 md:flex-row md:items-end md:justify-between">
         <div className="max-w-xl">
           <p className="text-sm font-medium text-white/80">Magandang araw!</p>
-          <h1 className="mt-1 text-3xl font-semibold sm:text-4xl">Welcome back, Teacher {firstName}</h1>
+          <h1 className="mt-1 text-3xl font-semibold sm:text-4xl">Welcome back{name}</h1>
           <p className="mt-2 text-white/85">
             What are we teaching today? Start from a topic or turn your materials into slides.
           </p>

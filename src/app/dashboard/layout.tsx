@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 
 import { Logo } from "@/components/brand/logo";
 import { MobileNav } from "@/components/dashboard/mobile-nav";
 import { SidebarNav } from "@/components/dashboard/sidebar-nav";
-import { TeacherCard } from "@/components/dashboard/teacher-card";
+import { TeacherCard, TeacherCardSkeleton } from "@/components/dashboard/teacher-card";
 
 export const metadata: Metadata = {
   title: "Dashboard",
@@ -20,13 +21,21 @@ export default function DashboardLayout({ children }: LayoutProps<"/dashboard">)
           <SidebarNav />
         </div>
         <div className="p-3">
-          <TeacherCard />
+          <Suspense fallback={<TeacherCardSkeleton />}>
+            <TeacherCard />
+          </Suspense>
         </div>
       </aside>
 
       <div className="flex min-w-0 flex-1 flex-col lg:pl-64">
         <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b border-border/60 bg-background/85 px-2 backdrop-blur-md sm:px-4 lg:hidden">
-          <MobileNav footer={<TeacherCard />} />
+          <MobileNav
+            footer={
+              <Suspense fallback={<TeacherCardSkeleton />}>
+                <TeacherCard />
+              </Suspense>
+            }
+          />
           <Logo href="/dashboard" />
         </header>
         <main

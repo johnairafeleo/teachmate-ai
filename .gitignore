@@ -32,6 +32,11 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# The template contains no secrets and documents required variables.
+!.env.example
+
+# Supabase local JWT signing keys (never commit)
+supabase/signing_keys.json
 
 # vercel
 .vercel
