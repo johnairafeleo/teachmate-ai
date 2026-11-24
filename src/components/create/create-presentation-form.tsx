@@ -1,14 +1,17 @@
 "use client";
 
-import { useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { Tabs } from "@base-ui/react/tabs";
-import { FileUp, FlaskConical, Info, Lightbulb, Sparkles, type LucideIcon } from "lucide-react";
+import { CircleAlert, CircleCheck, FileUp, FlaskConical, Info, Lightbulb, LoaderCircle, Sparkles, UploadCloud, type LucideIcon } from "lucide-react";
 
 import { ChoiceGroup } from "@/components/create/choice-group";
 import { FileDropzone } from "@/components/create/file-dropzone";
 import { describedBy, Field } from "@/components/create/form-field";
 import { OptionSelect } from "@/components/create/option-select";
 import { ThemePicker } from "@/components/create/theme-picker";
+import { UploadProgressPanel } from "@/components/create/upload/upload-progress-panel";
+import { validateTitle } from "@/components/create/upload/upload-state";
+import { useMaterialsUpload } from "@/components/create/upload/use-materials-upload";
 import { useFileSelection } from "@/components/create/use-file-selection";
 import { SlidePreview } from "@/components/presentation/slide-preview";
 import { Button } from "@/components/ui/button";
@@ -33,12 +36,13 @@ type LessonSettings = {
   theme: string;
 };
 
-type FieldName = "topic" | "objectives" | "materials" | "grade" | "subject";
+type FieldName = "topic" | "objectives" | "title" | "materials" | "grade" | "subject";
 type FormErrors = Partial<Record<FieldName, string>>;
 /** "not-connected": the form validated, but generation is not implemented in this phase. */
 type SubmitStatus = "idle" | "not-connected";
 
 const TOPIC_MAX = 150;
+const TITLE_MAX = 200;
 const OBJECTIVES_MAX = 600;
 const GENERATION_NOTICE_ID = "generation-notice";
 
@@ -54,7 +58,15 @@ function objectivesAnnouncement(length: number): string {
   if (remaining <= 100) return "Fewer than 100 characters remaining for learning objectives.";
   return "";
 }
-const FIELD_ORDER: FieldName[] = ["topic", "objectives", "materials", "grade", "subject"];
+const FIELD_ORDER: FieldName[] = ["topic", "objectives", "title", "materials", "grade", "subject"];
+
+/** Server validation reports field paths (e.g. "files.0.name"); map them onto form fields. */
+function fieldFromServerPath(path: string): FieldName | undefined {
+  const head = path.split(".")[0];
+  if (head === "title" || head === "grade" || head === "subject") return head;
+  if (head === "files") return "materials";
+  return undefined;
+}
 const SLIDE_COUNT_OPTIONS = SLIDE_COUNTS.map((count) => ({ value: count, label: count }));
 
 const MODE_TABS: { value: GenerationMode; icon: LucideIcon; title: string; description: string }[] = [
@@ -74,6 +86,10 @@ const MODE_TABS: { value: GenerationMode; icon: LucideIcon; title: string; descr
 
 export function CreatePresentationForm({ initialMode = "topic" }: { initialMode?: GenerationMode }) {
   const [mode, setMode] = useState<GenerationMode>(initialMode);
+  const [title, setTitle] = useState("");
+  const uploads = useMaterialsUpload();
+  const { run } = uploads;
+  const uploading = run.phase === "creating" || run.phase === "active";
   const [topic, setTopic] = useState("");
   const [objectives, setObjectives] = useState("");
   const fileSelection = useFileSelection();
@@ -116,16 +132,19 @@ export function CreatePresentationForm({ initialMode = "topic" }: { initialMode?
       if (objectives.length > OBJECTIVES_MAX) {
         next.objectives = `Keep objectives under ${OBJECTIVES_MAX} characters.`;
       }
-    } else if (files.length === 0) {
-      next.materials = "Add at least one PDF or DOCX file.";
+    } else {
+      const titleError = validateTitle(title);
+      if (titleError) next.title = titleError;
+      if (files.length === 0) next.materials = "Add at least one PDF or DOCX file.";
     }
     if (!settings.grade) next.grade = "Choose a grade level.";
     if (!settings.subject) next.subject = "Choose a subject.";
     return next;
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (uploading) return; // duplicate-submit guard (the hook guards again synchronously)
 
     const nextErrors = validate();
     setErrors(nextErrors);
@@ -137,20 +156,44 @@ export function CreatePresentationForm({ initialMode = "topic" }: { initialMode?
       return;
     }
 
-    // Development placeholder: AI generation and document processing are not connected
-    // in this phase. Validation still runs, but nothing is generated or uploaded.
-    setStatus("not-connected");
+    if (mode === "topic") {
+      // Development placeholder: AI generation is not connected in this phase.
+      setStatus("not-connected");
+      return;
+    }
+
+    await uploads.start(
+      { title, grade: settings.grade, subject: settings.subject, language: settings.language, theme: settings.theme, slideCount: settings.slideCount },
+      files.map((selected) => ({ key: selected.id, file: selected.file, kind: selected.kind })),
+    );
   }
+
+  // Draft-level failure from the server (quota, invalid input, session): back to the form.
+  const serverFields = (run.formErrorFields ?? []).map(fieldFromServerPath).filter((field): field is FieldName => Boolean(field));
+  const draftError = run.phase === "draft_failed" ? run.formError : undefined;
+  const titleError = errors.title ?? (draftError && serverFields.includes("title") ? "Check the title and try again." : undefined);
+  const firstServerField = FIELD_ORDER.find((field) => serverFields.includes(field));
+
+  // After a failed draft, move focus to the field the server rejected, or to the error itself.
+  useEffect(() => {
+    if (run.phase !== "draft_failed") return;
+    if (firstServerField) focusField(firstServerField);
+    else document.getElementById("draft-error")?.focus();
+  }, [run.phase, run.formError, firstServerField]);
 
   const theme = THEMES.find((option) => option.value === settings.theme) ?? THEMES[0];
   const previewTitle =
     mode === "topic"
       ? topic.trim() || "Your lesson title"
-      : files[0]?.file.name.replace(/\.(pdf|docx)$/i, "") || "Your lesson title";
+      : title.trim() || files[0]?.file.name.replace(/\.(pdf|docx)$/i, "") || "Your lesson title";
 
   return (
-    <form noValidate onSubmit={handleSubmit} className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
+    <form noValidate onSubmit={handleSubmit} aria-busy={uploads.busy || undefined} className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_20rem] lg:items-start">
       <div className="flex min-w-0 flex-col gap-6">
+        {uploading ? (
+          <UploadProgressPanel run={run} busy={uploads.busy} onRetry={(key) => void uploads.retry(key)} onReset={uploads.reset} />
+        ) : (
+        <>
         <Tabs.Root
           value={mode}
           onValueChange={(value) => {
@@ -251,6 +294,29 @@ export function CreatePresentationForm({ initialMode = "topic" }: { initialMode?
           <Tabs.Panel value="materials" className="outline-none">
             <FormSection step={1} title="Upload your learning materials">
               <Field
+                id="title"
+                label="Presentation title"
+                description="Shown on your dashboard and the first slide."
+                error={titleError}
+              >
+                <Input
+                  id="title"
+                  name="title"
+                  value={title}
+                  maxLength={TITLE_MAX}
+                  required
+                  placeholder="e.g. Parts of a Plant"
+                  autoComplete="off"
+                  aria-invalid={titleError ? true : undefined}
+                  aria-describedby={describedBy("title", { hasDescription: true, error: titleError })}
+                  onChange={(event) => {
+                    setTitle(event.target.value);
+                    touch("title");
+                  }}
+                  className="h-10 bg-card"
+                />
+              </Field>
+              <Field
                 id="materials"
                 label="Learning materials"
                 labelAs="legend"
@@ -307,6 +373,8 @@ export function CreatePresentationForm({ initialMode = "topic" }: { initialMode?
         <FormSection step={3} title="Pick a look">
           <ThemePicker id="theme" value={settings.theme} onValueChange={(value) => updateSetting("theme", value)} />
         </FormSection>
+        </>
+        )}
       </div>
 
       <aside aria-label="Presentation summary" className="lg:sticky lg:top-10">
@@ -314,7 +382,7 @@ export function CreatePresentationForm({ initialMode = "topic" }: { initialMode?
           <h2 className="text-lg font-semibold">Your presentation</h2>
           <SlidePreview colors={theme.colors} title={previewTitle} size="sm" />
           <dl className="grid grid-cols-2 gap-x-4 gap-y-3 text-sm">
-            <SummaryItem label="Source" value={mode === "topic" ? "Topic" : `${files.length} file${files.length === 1 ? "" : "s"}`} />
+            <SummaryItem label="Source" value={mode === "topic" ? "Topic" : `${uploading ? run.files.length : files.length} file${(uploading ? run.files.length : files.length) === 1 ? "" : "s"}`} />
             <SummaryItem label="Grade" value={settings.grade ? labelFor(GRADE_LEVELS, settings.grade) : "—"} />
             <SummaryItem label="Subject" value={settings.subject ? labelFor(SUBJECTS, settings.subject) : "—"} />
             <SummaryItem label="Language" value={labelFor(LANGUAGES, settings.language)} />
@@ -327,20 +395,39 @@ export function CreatePresentationForm({ initialMode = "topic" }: { initialMode?
             className="flex gap-2 rounded-xl border border-dashed border-input bg-muted/60 p-3 text-xs text-muted-foreground"
           >
             <FlaskConical className="mt-px size-4 shrink-0" aria-hidden="true" />
-            <span>
-              <strong className="font-semibold text-foreground">Development preview.</strong> AI
-              generation isn’t connected yet. You can check your details, but no presentation will
-              be created.
-            </span>
+            {mode === "topic" ? (
+              <span>
+                <strong className="font-semibold text-foreground">Development preview.</strong> AI
+                generation isn’t connected yet. You can check your details, but no presentation will
+                be created.
+              </span>
+            ) : (
+              <span>
+                <strong className="font-semibold text-foreground">Development preview.</strong> Your
+                files are uploaded privately, checked, and their text is read. Slide generation isn’t
+                connected yet.
+              </span>
+            )}
           </p>
 
-          <Button type="submit" className="h-11 w-full text-base" aria-describedby={GENERATION_NOTICE_ID}>
-            <Sparkles data-icon="inline-start" aria-hidden="true" />
-            {mode === "topic" ? "Generate from topic" : "Generate from materials"}
-          </Button>
+          {!uploading ? (
+            <Button type="submit" className="h-11 w-full text-base" aria-describedby={GENERATION_NOTICE_ID}>
+              {mode === "topic" ? <Sparkles data-icon="inline-start" aria-hidden="true" /> : <UploadCloud data-icon="inline-start" aria-hidden="true" />}
+              {mode === "topic" ? "Generate from topic" : "Upload materials"}
+            </Button>
+          ) : (
+            <Button type="button" disabled className="h-11 w-full text-base">
+              {uploads.busy ? (
+                <LoaderCircle data-icon="inline-start" aria-hidden="true" className="motion-safe:animate-spin" />
+              ) : (
+                <CircleCheck data-icon="inline-start" aria-hidden="true" />
+              )}
+              {run.phase === "creating" ? "Preparing upload…" : uploads.busy ? "Uploading…" : "Upload finished"}
+            </Button>
+          )}
 
           <div role="status" aria-live="polite">
-            {status === "not-connected" && (mode === "topic" || files.length > 0) ? (
+            {status === "not-connected" && mode === "topic" ? (
               <p className="flex gap-2 rounded-xl bg-secondary p-3 text-sm text-secondary-foreground">
                 <Info className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
                 Your details are complete. Generation isn’t connected yet, so no presentation was
@@ -348,6 +435,12 @@ export function CreatePresentationForm({ initialMode = "topic" }: { initialMode?
               </p>
             ) : null}
           </div>
+          {draftError ? (
+            <p id="draft-error" tabIndex={-1} role="alert" className="flex gap-2 rounded-xl border border-destructive/30 bg-destructive/8 p-3 text-sm font-medium text-destructive outline-none">
+              <CircleAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              {draftError.message}
+            </p>
+          ) : null}
           <p className="text-xs text-muted-foreground">
             You’ll be able to review and edit every slide before exporting.
           </p>

@@ -1,11 +1,6 @@
 import type { PresentationSummary } from "@/lib/types";
 
-/** Mock data only — replaced by Supabase queries in a later phase. */
-export const MOCK_TEACHER = {
-  firstName: "Maria",
-  school: "Sampaguita Elementary School",
-};
-
+/** Mock presentations only — replaced by Supabase queries in a later phase. */
 export const MOCK_PRESENTATIONS: PresentationSummary[] = [
   {
     id: "p-001",

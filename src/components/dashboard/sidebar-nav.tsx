@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Suspense } from "react";
 
 import { DASHBOARD_NAV } from "@/components/dashboard/nav-items";
 import { cn } from "@/lib/utils";
@@ -11,9 +12,24 @@ type SidebarNavProps = {
   onNavigate?: () => void;
 };
 
-export function SidebarNav({ onNavigate }: SidebarNavProps) {
-  const pathname = usePathname();
+/**
+ * usePathname() is unknown while prerendering pages with dynamic params (e.g.
+ * /dashboard/presentations/[id]), so the active-link version streams in behind Suspense and the
+ * prerendered fallback is the same list without an active item.
+ */
+export function SidebarNav(props: SidebarNavProps) {
+  return (
+    <Suspense fallback={<NavList pathname={null} {...props} />}>
+      <ActiveNavList {...props} />
+    </Suspense>
+  );
+}
 
+function ActiveNavList(props: SidebarNavProps) {
+  return <NavList pathname={usePathname()} {...props} />;
+}
+
+function NavList({ onNavigate, pathname }: SidebarNavProps & { pathname: string | null }) {
   return (
     <nav aria-label="Dashboard">
       <ul className="flex flex-col gap-1">
@@ -39,7 +55,7 @@ export function SidebarNav({ onNavigate }: SidebarNavProps) {
             );
           }
 
-          const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+          const isActive = pathname !== null && (item.exact ? pathname === item.href : pathname.startsWith(item.href));
 
           return (
             <li key={item.href}>

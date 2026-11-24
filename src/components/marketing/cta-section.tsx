@@ -14,7 +14,7 @@ export function CtaSection() {
           Create your first presentation in a few clicks.
         </p>
         <Link
-          href="/dashboard"
+          href="/signup"
           className={buttonVariants({
             variant: "secondary",
             className: "mt-8 h-11 bg-white px-6 text-base text-primary hover:bg-white/90",

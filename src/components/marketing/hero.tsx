@@ -33,7 +33,7 @@ export function Hero() {
             export.
           </p>
           <div className="flex flex-wrap gap-3">
-            <Link href="/dashboard" className={buttonVariants({ className: "h-11 px-5 text-base" })}>
+            <Link href="/signup" className={buttonVariants({ className: "h-11 px-5 text-base" })}>
               Get Started
               <ArrowRight data-icon="inline-end" />
             </Link>
